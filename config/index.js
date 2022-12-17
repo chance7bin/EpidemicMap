@@ -10,7 +10,22 @@ module.exports = {
     // Paths
     assetsSubDirectory: 'static',
     assetsPublicPath: '/',
-    proxyTable: {},
+    proxyTable: {
+      // 这里配置 '/api' 就等价于 target , 你在链接里访问 /api === http://localhost:54321
+      // '/ChinaOnlineCommunity': {
+      //   target: 'https://map.geoq.cn/arcgis/rest/services/ChinaOnlineCommunity',
+      //   secure: true, // 如果是 https ,需要开启这个选项
+      //   changeOrigin: true, // 是否是跨域请求?肯定是啊,不跨域就没有必要配置这个proxyTable了.
+      //   pathRewrite: { // 重写路径  例如浏览器请求地址http://localhost:12345/xxx,实际请求的是你代理的地址：http:xxx/11111
+      //     // 这里是追加链接,比如真是接口里包含了 /api,就需要这样配置.
+      //     '^/ChinaOnlineCommunity': '/ChinaOnlineCommunity', // 和下边两种写法，因人而异根据需求。
+      //     // 等价于    /api + /api  ==  http://localhost:54321/api
+      //     // 如果写为 '^/api' : '/'
+      //     // 等价于   /api + /  ==  http://localhost:54321/
+      //     // 这里的 /api ==  http://localhost:54321
+      //   }
+      // }
+    },
 
     // Various Dev Server settings
     host: 'localhost', // can be overwritten by process.env.HOST

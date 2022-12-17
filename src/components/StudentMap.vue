@@ -6,17 +6,53 @@
       <div class="map-title map-control-item">新疆学生分布图</div>
 
       <div class="num-toggle map-control-item">
-        <span>显示：</span>
-        <el-switch
-          v-model="showStudentNum"
-          active-text="学生人数"
-          inactive-text="行政区划">
-        </el-switch>
+<!--        <div style="margin: 10px 20px;">
+          <el-row :gutter="0">
+            <el-col class="col-item-label" :span="6"><span>显示：</span></el-col>
+            <el-col class="col-item" :span="18">
+              <el-switch
+                v-model="showStudentNum"
+                active-text="学生人数"
+                inactive-text="风险等级">
+              </el-switch>
+            </el-col>
+          </el-row>
+          <el-row :gutter="0">
+            <el-col class="col-item-label" :span="6"><span>注记：</span></el-col>
+            <el-col class="col-item" :span="18">
+              <el-switch
+                v-model="showLabel"
+                active-text="开"
+                inactive-text="关">
+              </el-switch>
+            </el-col>
+          </el-row>
+        </div>-->
+        <div style="margin: 10px 30px;">
+          <div>
+            <span>显示：</span>
+            <el-switch
+              v-model="showStudentNum"
+              active-text="学生人数"
+              active-color="#13ce66"
+              inactive-text="风险等级">
+            </el-switch>
+          </div>
+          <div>
+            <span>注记：</span>
+            <el-switch
+              v-model="showLabel"
+              active-text="开"
+              active-color="#13ce66"
+              inactive-text="关">
+            </el-switch>
+          </div>
+        </div>
       </div>
 
     </div>
 
-    <div class="map-control-bottom">
+    <div class="map-control-bottom" v-show="!showStudentNum">
       <div class="legend map-control-item">
 <!--        <h4>风险等级 <span>(数据时间：2022-10-08 10:00:00)</span></h4>-->
         <h4>风险等级</h4>
@@ -24,6 +60,17 @@
         <div><span style="background-color: #ec0000"></span>高风险 (包含高、中、低风险区的地区)</div>
         <div><span style="background-color: #e88c08"></span>中风险 (包含中、低风险区的地区)</div>
         <div><span style="background-color: #35e34f"></span>常态化防控地区</div>
+      </div>
+    </div>
+
+    <div class="map-control-bottom"  v-show="showStudentNum">
+      <div class="legend map-control-item">
+        <h4>各地区学生人数 (N)</h4>
+        <div><span :style="'background-color:' + studentNumColor[0]"></span>N = 0</div>
+        <div><span :style="'background-color:' + studentNumColor[1]"></span>0 < N ≤ 5</div>
+        <div><span :style="'background-color:' + studentNumColor[2]"></span>5 < N ≤ 10</div>
+        <div><span :style="'background-color:' + studentNumColor[3]"></span>10 < N ≤ 15</div>
+        <div><span :style="'background-color:' + studentNumColor[4]"></span>N > 15</div>
       </div>
     </div>
 
@@ -41,7 +88,7 @@
         <div style="padding: 10px 0; font-size: x-large; text-align: center;">学生信息</div>
         <div style="padding: 10px 0; font-size: large; text-align: center;">{{district}}</div>
         <div v-if="filterData.length !== 0">
-
+          <div style="font-weight: bold">该地区学生人数: {{studentNum}}</div>
           <el-table
             :data="filterData"
             stripe
@@ -119,12 +166,14 @@ export default {
     return {
       map:null,
       showStudentNum: false,
+      showLabel:true,
       drawer: false,
       direction: 'rtl',
       //是否有遮罩
       isModel: false,
       district:"地区",
       xinjiangArea:{},
+      xinjiangPoint:{},
       studentData:[],
       filterData:[],
       xinjiangDistrict:[],
@@ -139,6 +188,7 @@ export default {
       //加载的数据路径
       //新疆底图
       xinjiangAreaPath:"static/json/xinjiang_new2.json",
+      xinjiangPointPath:"static/json/xinjiang_new2_FeatureToPoint.json",
       //新疆行政区名
       xinjiangDistrictPath:"static/json/xinjiang_district2.json",
       //学生数据
@@ -146,9 +196,11 @@ export default {
       //疫情数据
       // fengxianDataPath:"/yiqingApi/http/fengxian",
       fengxianDataPath:"http://172.21.213.151/yiqingApi/http/fengxian",
+      studentNum: 0,
+      studentNumColor:['#c4bfbf','#b6edf0','#74b4e8','#1f83e0','#1d44b8','#090991'],
 
       //测试匹配的学生情况
-      totalNum:0
+      totalNum:0,
 
     };
   },
@@ -158,8 +210,21 @@ export default {
   },
 
   watch:{
-    showStudentNum(val){
-      this.toggleDisplayItem(val);
+    showStudentNum(showStudentNum){
+      this.toggleDisplayItem(showStudentNum);
+    },
+    drawer(showDrawer){
+      if (!showDrawer){
+        this.map.setLayoutProperty("counties-highlighted", 'visibility', 'none');
+      }
+    },
+    showLabel(showLabel){
+      if (showLabel){
+        this.map.setLayoutProperty("district_name", 'visibility', 'visible');
+      } else {
+        this.map.setLayoutProperty("district_name", 'visibility', 'none');
+      }
+
     }
   },
 
@@ -170,6 +235,7 @@ export default {
       //构造地图前的步骤
       this.studentData = (await this.loadStudentData()).data;
       this.xinjiangArea = (await this.loadXingjiangArea()).data;
+      this.xinjiangPoint = (await this.loadXingjiangPoint()).data;
       // this.xinjiangDistrict = (await this.loadXinjiangDistrict()).data;
       //行政区名通过底图构造
       let features = this.xinjiangArea.features;
@@ -193,6 +259,7 @@ export default {
       //添加学生数量
       for (let i = 0; i < this.xinjiangDistrict.length; i++) {
         this.xinjiangArea.features[i].properties.studentNum = this.xinjiangDistrictStat[i].num
+        this.xinjiangPoint.features[i].properties.studentNum = this.xinjiangDistrictStat[i].num
       }
 
       let fengxianData = (await this.loadFengxianData()).data;
@@ -247,7 +314,9 @@ export default {
         this.map.addSource('esriMap', {
           type: 'raster',
           tiles: [
-            'https://map.geoq.cn/arcgis/rest/services/ChinaOnlineCommunity/MapServer/tile/{z}/{y}/{x}'
+            // 'https://map.geoq.cn/arcgis/rest/services/ChinaOnlineCommunity/MapServer/tile/{z}/{y}/{x}'
+            'http://172.21.213.151/ChinaOnlineCommunity/MapServer/tile/{z}/{y}/{x}'
+            // '/ChinaOnlineCommunity/MapServer/tile/{z}/{y}/{x}'
           ],
           tileSize: 256,
           style: {
@@ -274,6 +343,11 @@ export default {
           data: this.xinjiangArea
         })
 
+        this.map.addSource('point_layer', {
+          type: 'geojson',
+          data: this.xinjiangPoint
+        })
+
         // 添加边框
         this.map.addLayer({
           id: 'district_layer',
@@ -281,29 +355,10 @@ export default {
           source: 'district_layer',
           paint: {
             // 'fill-color': 'rgba(200, 100, 240, 0.4)',
-            'fill-color': 'rgba(4,245,47,0.4)',
+            'fill-color': 'rgba(4,245,47,0.6)',
             'fill-outline-color': 'rgba(200, 100, 240, 1)'
           }
         })
-
-
-
-
-        // 高亮图层
-        this.map.addLayer(
-          {
-            'id': 'counties-highlighted',
-            'type': 'fill',
-            'source': 'district_layer',
-            'paint': {
-              'fill-outline-color': '#484896',
-              'fill-color': '#6e599f',
-              'fill-opacity': 0.75
-            },
-            'filter': ['in', this.relateProp, '']
-          }
-        ); // Place polygon under these labels.
-
 
 
         this.map.on('click', 'district_layer', (e) => {
@@ -327,6 +382,7 @@ export default {
           var feature = e.features[0];
           this.map.setFilter('counties-highlighted', ['in', this.relateProp, feature.properties[this.relateProp]]);
 
+          this.map.setLayoutProperty("counties-highlighted", 'visibility', 'visible');
 
           let name = e.features[0].properties[this.relateProp];
 
@@ -342,6 +398,7 @@ export default {
           //将信息展示在侧边栏上
           this.drawer = true;
           this.district = e.features[0].properties["ext_path"];
+          this.studentNum = e.features[0].properties["studentNum"];
         });
 
 
@@ -353,7 +410,7 @@ export default {
             'type': 'fill',
             'source': 'district_layer',
             'paint': {
-              'fill-outline-color': '#484896',
+              'fill-outline-color': 'rgba(200, 100, 240, 1)',
               'fill-color': '#ec0000',
               'fill-opacity': 0.75
             },
@@ -368,7 +425,7 @@ export default {
             'type': 'fill',
             'source': 'district_layer',
             'paint': {
-              'fill-outline-color': '#484896',
+              'fill-outline-color': 'rgba(200, 100, 240, 1)',
               'fill-color': '#e88c08',
               'fill-opacity': 0.75
             },
@@ -378,26 +435,74 @@ export default {
 
 
         // 添加地区学生人数
-        this.map.addLayer({
-          id: 'student_num',
-          type: 'symbol',
-          source: 'district_layer',
-          layout: {
-            'text-field': '{studentNum}',
-            'text-size': 14
-          },
-          paint: {
-            'text-color': '#000'
+        // this.map.addLayer({
+        //   id: 'student_num',
+        //   type: 'symbol',
+        //   source: 'district_layer',
+        //   layout: {
+        //     'text-field': '{studentNum}',
+        //     'text-size': 14
+        //   },
+        //   paint: {
+        //     'text-color': '#000'
+        //   }
+        // })
+
+        // 参考链接
+        // https://docs.mapbox.com/mapbox-gl-js/example/cluster-html/
+        // https://docs.mapbox.com/mapbox-gl-js/style-spec/expressions/#decision
+        this.map.addLayer(
+          {
+            'id': 'student-num-layer',
+            'source': 'district_layer',
+            'type': 'fill',
+            'paint': {
+              'fill-color': [
+                'case',
+                ['<=', ['get', 'studentNum'], 0],
+                this.studentNumColor[0],
+                ['<=', ['get', 'studentNum'], 5],
+                this.studentNumColor[1],
+                ['<=', ['get', 'studentNum'], 10],
+                this.studentNumColor[2],
+                ['<=', ['get', 'studentNum'], 15],
+                this.studentNumColor[3],
+                this.studentNumColor[4]
+              ],
+              'fill-opacity': 1,
+              'fill-outline-color': 'rgba(200, 100, 240, 1)'
+            }
           }
-        })
+        );
+
+        // 显示隐藏图层
+        // this.map.setLayoutProperty("district_name", 'visibility', 'visible');
+        this.map.setLayoutProperty("student-num-layer", 'visibility', 'none');
+
+
+        // 高亮图层
+        this.map.addLayer(
+          {
+            'id': 'counties-highlighted',
+            'type': 'fill',
+            'source': 'district_layer',
+            'paint': {
+              // 'fill-outline-color': '#484896',
+              'fill-outline-color': 'rgba(200, 100, 240, 1)',
+              'fill-color': '#6e599f',
+              'fill-opacity': 0.75
+            },
+            'filter': ['in', this.relateProp, '']
+          }
+        ); // Place polygon under these labels.
 
         // 添加名字
         this.map.addLayer({
           id: 'district_name',
           type: 'symbol',
-          source: 'district_layer',
+          source: 'point_layer',
           layout: {
-            'text-field': '{' + this.relateProp + '}',
+            'text-field': '{' + this.relateProp + '} : ' + '{studentNum}',
             'text-size': 14
           },
           paint: {
@@ -405,8 +510,6 @@ export default {
           }
         })
 
-        this.map.setLayoutProperty("district_name", 'visibility', 'visible');
-        this.map.setLayoutProperty("student_num", 'visibility', 'none');
 
         // Change the cursor to a pointer when
         // the mouse is over the states layer.
@@ -464,6 +567,10 @@ export default {
       return axios(this.xinjiangAreaPath);
     },
 
+    loadXingjiangPoint(){
+      return axios(this.xinjiangPointPath);
+    },
+
 
     loadXinjiangDistrict(){
       // axios('/static/json/xinjiangDistrict.json').then(({data}) => {
@@ -481,11 +588,11 @@ export default {
 
     toggleDisplayItem(showStudentNum){
       if (showStudentNum){
-        this.map.setLayoutProperty("district_name", 'visibility', 'none');
-        this.map.setLayoutProperty("student_num", 'visibility', 'visible');
+        // this.map.setLayoutProperty("district_name", 'visibility', 'none');
+        this.map.setLayoutProperty("student-num-layer", 'visibility', 'visible');
       } else {
-        this.map.setLayoutProperty("district_name", 'visibility', 'visible');
-        this.map.setLayoutProperty("student_num", 'visibility', 'none');
+        // this.map.setLayoutProperty("district_name", 'visibility', 'visible');
+        this.map.setLayoutProperty("student-num-layer", 'visibility', 'none');
       }
     },
 
@@ -675,7 +782,15 @@ body {
 
 .num-toggle{
   margin-top: 10px;
-  padding: 10px 30px;
+  /*padding: 10px 30px;*/
+}
+
+.num-toggle .col-item{
+  text-align: center;
+}
+
+.num-toggle .col-item-label{
+  text-align: right;
 }
 
 .map-legned{
@@ -707,6 +822,7 @@ body {
 #map {
   position: absolute;
   top: 0;
+  left: 0;
   bottom: 0;
   width: 100%;
 }
