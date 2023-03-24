@@ -1,6 +1,6 @@
 # epidemic-map
 
-> A Vue.js project
+> 用Mapbox做的一个疫情期间风险分布图
 
 ## Build Setup
 
